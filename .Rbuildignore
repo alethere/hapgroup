@@ -1,0 +1,7 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+R/data_prep.R
+data/Phases.txt
+^data/Phases\.txt$
+^R/data_prep\.R$
+^LICENSE\.md$

@@ -1,0 +1,27 @@
+Package: hapgroup
+Type: Package
+Title: Haplotype allele clustering
+Version: 0.1.0
+Author: Alejandro Therese Navarro
+Maintainer: Alejandro Therese Navarro <alejandro.th.na@gmail.com>
+Description: This package can be used to cluster alleles of phased data using
+  a graph-based clustering approach. It simplifies several analyses of allele diversity,
+  allele comparison, allele similarity, and frequency. 
+    The main utility within this package is an R6 class `hapBlock` which automates
+  allele comparison and grouping and can be easily used to perform haplotype analysis
+  at a large scale. Importantly, this analysis depends on already-phased SNP data, which
+  can be achieved through tools like BEAGLE, SHAPEIT, WhatsHap, etc. 
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 2.10),
+    dplyr,
+    igraph,
+    stringr,
+    testthat
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+RoxygenNote: 7.3.2
