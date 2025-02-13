@@ -10,8 +10,8 @@ To install `hapgroup` you can use the following code:
 devtools::install_github("https://github.com/alethere/hapgroup",build_vignettes = TRUE)
 ```
 
-And to see the vignette you can go to this link or browse it from the package:
+And to see the vignette you can go to [this link](alethere.github.io/hapgroup) or browse it from the package:
 
 ```{r}
-
+browseVignettes(hapgroup)
 ```
