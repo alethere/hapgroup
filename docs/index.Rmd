@@ -150,20 +150,14 @@ You can obtain some information about each haplogroup using the function
 `haplostats()`. The result provides a data.frame with the following
 columns: 
 
-- **group**: haplogroup code, numbered from most to least frequent - meanD: mean
-distance (mismatches) between variants within the group 
-- **nvars**: number
-of distinct variants within the group 
-- **groupFreq**: number of times the
-group is observed in the total population 
-- **consensus**: consensus
-variant, where each position is the most frequent. If less than 3/4 of
-the observed variants have the same allele in a position, an N is
+- **group**: haplogroup code, numbered from most to least frequent 
+- **meanD**: mean distance (mismatches) between variants within the group 
+- **nvars**: number of distinct variants within the group 
+- **groupFreq**: number of times the group is observed in the total population 
+- **consensus**: consensus variant, where each position is the most frequent. If less than 3/4 of the observed variants have the same allele in a position, an N is
 returned instead.
-- **freqVar**: the most frequent variant within the
-haplogroup 
-- **freq**: the frequency, within the haplogroup, of the most
-frequent variant
+- **freqVar**: the most frequent variant within the haplogroup 
+- **freq**: the frequency, within the haplogroup, of the most frequent variant
 
 ```{r}
 myBlock$haplostats()
