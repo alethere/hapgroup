@@ -5,3 +5,4 @@ data/Phases.txt
 ^data/Phases\.txt$
 ^R/data_prep\.R$
 ^LICENSE\.md$
+^vignettes/Tutorial\.html$
