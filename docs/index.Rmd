@@ -1,0 +1,291 @@
+---
+title: "Haplotype comparison"
+author: "Alejandro Therese Navarro"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    check_title: FALSE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(hapgroup)
+```
+
+This vignette will help you analyse haplotype data by dealing with the
+inflation of rare alleles due to low-frequency genotyping errors.
+
+If you have any issue with it please let me know through my github page:
+<https://github.com/alethere/hapgroup>
+
+## 0. Data used
+
+There are two essential pieces of information necessary for this package
+to work:
+
+1.  A data.frame of "**phases**", SNP data, expressed as a combination of 0s
+    and 1s (0 = reference allele, 1 = alternative allele). Markers are
+    in rows, individuals in columns. Each individual has `ploidy`
+    columns (so for a diploid, there will be two columns per
+    individual).
+2.  A vector of **individual names**, unrepeated, in the same order as in
+    the "phases" data.frame.
+
+There is a third piece of information that is quite useful, a "position"
+data.frame(), which contains marker information. This data.frame must
+have columns "POS", "CHROM", "REF" and "ALT".
+
+These three datasets are provided as example data: `exPhase`, `exInds`,
+`exPos`.
+
+```{r}
+#Table of phases
+knitr::kable(exPhase[1:5,1:10])
+#Vector of individual names
+exInds[1:5]
+
+#Position data.frame
+knitr::kable(exPos[1:5,])
+```
+
+## 1. Join markers into blocks
+
+Haploblocks are defined as groups of markers that are "blocked" or
+"joined together", which combined can be turned into haplotype alleles.
+These can be defined in many ways and you can choose your own way. The
+`hapBlock` object performs haplotyping one block at a time, so defining
+which markers fall into a haploblock is totally up to you as the user.
+
+I do provide a simple function that should help you with some easy
+definitions of haploblocks, the `calcBlock()` functions. This function
+can divide markers into blocks based on:
+
+1.  Number of markers within a block (`n`). Every `n` markers a new
+    block is started.
+2.  Distance between markers (`window`). Starting from the first marker,
+    all markers within a window of size `window` are grouped into a
+    block.
+
+You can choose to exclude blocks below a number of markers of
+`exclude.size`.
+
+To compute these blocks you must provide a position data.frame as
+described above.
+
+The result will be a list of data.frames (a split data.frame), with an
+added column `index` which can be useful to subset the `phase` data.
+
+```{r}
+#For example, we can compute blocks with a window size
+winBlocks <- calcBlocks(exPos, window = 20000, exclude.size = 2)
+
+winBlocks[1:3]
+
+#We can also compute blocks specifying a specific number of markers within a window
+#I also exclude all those below the chosen size
+nBlocks <- calcBlocks(exPos, n = 10, exclude.size = 9)
+
+nBlocks[1:3]
+
+```
+
+You may notice that window sizes do not exaclty match what we asked for:
+this is unavoidable. If you set a start at position `x` and you take all
+markers from `x` to `x + 10000` the last marker will not be at a
+distance of `10000` from the first marker (because the first marker is
+not at `x` and the last marker is not at `x + 10000`).
+
+## 2. Haplogrouping
+
+The bread and butter of this package is the R6 class `hapBlock`. You may
+not have used R6 classes before but they are quite simple to use (you
+can find more information
+[here](https://r6.r-lib.org/articles/Introduction.html) ). They are
+basically a list, with some of its items being functions (which are
+often called methods), and some hidden items (containing all the
+provided data).
+
+Let us look at a single, small haploblock.
+
+```{r}
+
+b <- winBlocks[[4]]
+
+#hapBlock objects (and R6 objects in general) are always started with the function new()
+myBlock <- hapBlock$new(phase = exPhase[b$index,], inds = exInds, ploidy = 2, pos = b)
+
+myBlock
+
+```
+
+This haploblock right now only contains the alleles as we have defined
+them, no grouping has been performed yet. To perform the grouping we
+must use the `haplogroup()` method. This will group alleles based on an
+expected error rate (by default 0.01 or 1%).
+
+```{r}
+myBlock$haplogroup()
+```
+
+We can check the expected number of mismatches given one (or more) error
+rates using the `mismatch()` method.
+
+```{r}
+myBlock$mismatch(c(0.01,0.02,0.05,0.1))
+```
+
+By default, **the upper boundary of the CI is used**. For this block,
+this is `r round(myBlock$mismatch(0.01)[[3]],2)` out of `r nrow(myBlock$phase)`. We can override this
+if necessary with the argument `mismatch`
+
+```{r}
+myBlock$haplogroup(mismatch = 2)
+```
+
+### 2.1 Haplogroup evaluation
+
+You can obtain some information about each haplogroup using the function
+`haplostats()`. The result provides a data.frame with the following
+columns: 
+
+- **group**: haplogroup code, numbered from most to least frequent - meanD: mean
+distance (mismatches) between variants within the group 
+- **nvars**: number
+of distinct variants within the group 
+- **groupFreq**: number of times the
+group is observed in the total population 
+- **consensus**: consensus
+variant, where each position is the most frequent. If less than 3/4 of
+the observed variants have the same allele in a position, an N is
+returned instead.
+- **freqVar**: the most frequent variant within the
+haplogroup 
+- **freq**: the frequency, within the haplogroup, of the most
+frequent variant
+
+```{r}
+myBlock$haplostats()
+```
+
+You can also visualize the grouping of the found variants using the
+`plotGrouping()` method. You may need to adjust the vertex size:
+
+```{r,dpi = 300, out.width= 700, out.height=500, fig.width=7, fig.height=5}
+par(mar = c(0,0,0,2))
+myBlock$plotGrouping(vertex.size = 8)
+```
+
+Notice that haplogroups that represent a single variant are not plotted
+in the clustering graph plot.
+
+### 2.2 Retrieving alleles
+
+Once groups have been established (or before), you may want to obtain
+the specific alleles for each individuals. You can obtain these alleles
+in several forms: 
+
+- **allele**: binary code where 0 means reference allele
+and 1 means alternative allele. For example: 00010, 00110, 11110 ... 
+- **variant**: alphanumeric variant codes, where each unique variant is given
+a specific name. For example: V010, V011, V123... 
+- **haplotype**: alphanumeric haplotype codes, based on a pre-calculated haplotype
+grouping using `haplogroup()`. For example: H01, H02, H03... Haplotype
+numbers are based on frequency (H01 is always the most frequent). 
+- **sequence**: DNA sequences based on reference and alternative alleles, as
+well as on a reference sequence. Can only be used after using the method
+`buildSequences()`. For example: "AACCTTTG", "AACCATTG", "AACCATTC"...
+
+```{r}
+#Notice that each individual has two entries, corresponding to its two alleles
+
+#These are alleles in binary code
+myBlock$alleles("al")[1:8]
+
+#In variant codes
+myBlock$alleles("var")[1:20]
+
+#In haplotype code
+myBlock$alleles("hap")[1:20]
+
+#In sequence code we cannot get it yet
+myBlock$alleles("seq")[1:10]
+```
+
+To see the "sequence" alleles directly we must provide a template
+sequence. In this case we will just use a toy example full of "\_" so
+that you can easily see what is happening under the hood.
+
+```{r}
+start <- min(b$POS)
+end <- max(b$POS)
+
+seq <- paste(rep("_", end - start + 10), collapse = "")
+myBlock$buildSequences(sequence = seq, start = start - 9)
+```
+
+Now we can obtain the sequence allele, you can see that simply, in each
+position the reference allele is changed by the alternative allele.
+
+```{r}
+res <- myBlock$alleles("seq")[1]
+#I split it because it is too long
+res <- sapply(seq(1,to = nchar(res), by = 100),function(i) substr(res,i, i + 99))
+cat(unname(res),sep = "\n")
+```
+
+### 2.3 MST plot
+
+There is something called an MST plot, or maximum spanning tree, which
+is a type of graph often used in haplotype comparisons. I worked a bit
+on the visualization, although I'm not very happy with it (thus why it
+is not a part of the R6 `hapBlock` class). You can use it as shown
+below, if you give it some alleles you care about (I often remove the
+low-frequency alleles).
+
+Several of the parameters must be adjusted manually (especially
+`vertex.size` and `label.size`). Play with it if you're not satisfied with
+the result (or find a different visualization).
+
+```{r, fig.height=5,fig.width=7, out.height=500, out.width=700,dpi = 300}
+stats <- myBlock$haplostats()
+
+alleles <- stats$freqVar[stats$groupFreq > 1]
+names(alleles) <- stats$group[stats$groupFreq > 1]
+freqs <- stats$freq[ stats$groupFreq > 1]
+haploMST(alleles = alleles, allele.freq = freqs,vertex.size = 30, label.size = 0.8)
+```
+
+## 3. More data
+
+You can retrieve several pieces of information from the `hapBlock`
+object which may be useful to you if you are doing analysis.
+
+```{r}
+
+#This is the distance matrix between observed variants
+myBlock$D[1:10,1:10]
+
+#The list of ploidy-repeated alleles
+myBlock$inds[1:10]
+
+#The codes dataframe which relates alleles to vairants (and other information)
+#Here I truncate the sequence column, otherwise it's too long
+codes <- myBlock$codes[1:10,]
+codes$sequence <- substr(codes$sequence,1,15)
+knitr::kable(codes)
+
+#The phase data if you need it
+knitr::kable(myBlock$phase[1:10,1:10])
+
+```
+
+## 4. Future developments?
+
+Although I do not plan to develop this further at the moment, I leave these ideas here in case someone (or my future self) wants to develop additional things.
+
+1. It may be better to group alleles not based on similarity, but based on a comparison of the low-frequency haplotypes to the high-frequency haplotypes, and using mismatch probabilities (a Poisson test) to determine if the variant can be confidently grouped into haplotypes or not. 
+2. Calculation of blocks using window-based sizes should not simply take position $x$ and get all markers until $x+window$, but rather, starting from position $x$, find the first marker and then get all markers within the specified window size (thus avoiding a large gap at the beggining of the window). 
+3. Block calculation may be enhanced by using genome-location features. How to approach this?
+4. A wrapper to parallelize haplogroup computation across many blocks. The pieces are there, it's just a matter of intelligently creating a `%dopar%` loop and returning the relevant results (not the whole `hapBlock` object.)
